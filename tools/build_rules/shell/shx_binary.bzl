@@ -2,10 +2,10 @@
 """shx: nifty self-extracting shell script executables
 
 shx files are like pex binaries, but for bash scripts instead of python apps.
-Internally, they are just ZIP files with special shell script header.  You can
-use shx archives to wrap and deploy any type of files; just be mindful of how
-long the unzip operation will take at startup if it's something you expect to
-launch frequently.
+Internally, they are just ZIP files with a special shell script header.  You
+can use shx archives to wrap and deploy any type of files; just be mindful of
+how long the unzip operation will take at startup if it's something you expect
+to launch frequently.
 
 When you add data dependencies to a shx_binary, they can be found at runtime in
 `${RUNFILES}/` at the path where the build target is defined.  For example, if
@@ -92,21 +92,23 @@ def _shx_binary(ctx):
       mnemonic = "MakeZip",
       inputs = list(runfiles.files) + [ctx.outputs.executable],
       outputs = [ctx.outputs.zip],
+      # keep things like $PATH since we use mktemp, find, cat, touch, mkdir, cp
+      use_default_shell_env = True,
       command = "\n".join(
           [
               'set -e',  # You'd think this would be the default...
               'TMPDIR=$(mktemp -d ./shx.XXXXXX)',
-              'trap "rm -rf ${TMPDIR}" EXIT',
+              'trap "rm -rf \'${PWD}/${TMPDIR}\'" EXIT',
               'NAME="%s"' % ctx.label.name,
               # mkdir in case NAME has slashes in it (yes, it can!)
               'mkdir -p $(dirname "${TMPDIR}/${NAME}")',
               'RUNFILES="${TMPDIR}/${NAME}.runfiles/%s"' % ctx.workspace_name,
-              'ln -s "$PWD/%s" "${TMPDIR}/${NAME}"' % ctx.outputs.executable.path,
+              'cp -f "$PWD/%s" "${TMPDIR}/${NAME}"' % ctx.outputs.executable.path,
               'mkdir -p "${TMPDIR}/${NAME}.runfiles"'
           ] +
           [   # Make the runfiles symlink tree to zip up
               'mkdir -p "${RUNFILES}/%s";' % _dirname(f) +
-              'ln -s "$PWD/%s" "${RUNFILES}/%s"' % (f.path, f.short_path)
+              'cp -f "$PWD/%s" "${RUNFILES}/%s"' % (f.path, f.short_path)
               for f in runfiles.files
           ] +
           [   # Set a fixed mtime and atime for repeatable builds
@@ -126,6 +128,8 @@ def _shx_binary(ctx):
       mnemonic = "MakeSelfExtractable",
       inputs = [ctx.outputs.zip_header, ctx.outputs.zip] + list(runfiles.files),
       outputs = [ctx.outputs.shx],
+      # keep things like $PATH since we use cat and zip from the host
+      use_default_shell_env = True,
       command = "\n".join([
           'set -e',
           'cat "%s" "%s" > "%s"' % (

@@ -6,14 +6,14 @@ die() {
   exit 15
 }
 
-TMPDIR=$(mktemp -d -t "${0##*/}") || die "mktemp failed!"
+SHX_TMPDIR=$(mktemp -d -t "${0##*/}.XXXXXX") || die "mktemp failed!"
 
-trap "rm -rf '$TMPDIR'" EXIT
+trap "rm -rf '$SHX_TMPDIR'" EXIT
 
-unzip -q "${BASH_SOURCE[0]}" -d "$TMPDIR" || die "Failed to unzip!"
+unzip -q "${BASH_SOURCE[0]}" -d "$SHX_TMPDIR" || die "Failed to unzip!"
 
 # Source main in a subshell to keep the EXIT trap, $0 intact, and use the exact
 # same bash executable
-(source "${TMPDIR}/%{main}" "$@")
+(source "${SHX_TMPDIR}/%{main}" "$@")
 
 exit $?  # Explicitly exit because after this line comes compressed binary data
