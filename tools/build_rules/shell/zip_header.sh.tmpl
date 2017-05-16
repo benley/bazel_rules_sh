@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# shx startup bootstrap
+
+die() {
+  echo "shx bootstrap: $*" >&2
+  exit 15
+}
+
+TMPDIR=$(mktemp -d -t "${0##*/}") || die "mktemp failed!"
+
+trap "rm -rf '$TMPDIR'" EXIT
+
+unzip -q "${BASH_SOURCE[0]}" -d "$TMPDIR" || die "Failed to unzip!"
+
+# Source main in a subshell to keep the EXIT trap, $0 intact, and use the exact
+# same bash executable
+(source "${TMPDIR}/%{main}" "$@")
+
+exit $?  # Explicitly exit because after this line comes compressed binary data
